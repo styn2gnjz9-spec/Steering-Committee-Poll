@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Scheduling Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #E8ECF0;
+    --panel: #FFFFFF;
+    --ink: #1B2430;
+    --ink-soft: #5B6572;
+    --ink-faint: #8B96A3;
+    --line: #D6DEE4;
+    --board-bg: #1B1F2A;
+    --board-panel: #232838;
+    --board-line: #333B4A;
+    --amber: #F2B84B;
+    --amber-ink: #4A3410;
+    --teal: #4FD1C5;
+    --teal-ink: #0C3A36;
+    --coral: #E1574C;
+    --radius: 12px;
+    --font-display: 'Space Grotesk', sans-serif;
+    --font-body: 'Inter', sans-serif;
+    --font-mono: 'IBM Plex Mono', monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--font-body);
+    -webkit-font-smoothing:antialiased;
+  }
+  #app{
+    max-width:960px;
+    margin:0 auto;
+    padding:28px 20px 80px;
+  }
+  a{color:inherit;}
+
+  /* ---------- Header ---------- */
+  .app-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    margin-bottom:28px;
+    flex-wrap:wrap;
+    gap:12px;
+  }
+  .eyebrow{
+    font-family:var(--font-mono);
+    font-size:11px;
+    letter-spacing:0.18em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+    margin:0 0 6px;
+  }
+  .app-title{
+    font-family:var(--font-display);
+    font-weight:700;
+    font-size:32px;
+    margin:0;
+    letter-spacing:-0.01em;
+  }
+  .board-clock{
+    font-family:var(--font-mono);
+    font-size:13px;
+    color:var(--ink-soft);
+    text-align:right;
+    line-height:1.5;
+  }
+  .board-clock .time{
+    font-size:20px;
+    color:var(--ink);
+    font-weight:500;
+  }
+
+  /* ---------- Buttons ---------- */
+  .btn{
+    font-family:var(--font-mono);
+    font-size:12px;
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+    border:none;
+    border-radius:8px;
+    padding:11px 18px;
+    cursor:pointer;
+    transition:transform .12s ease, box-shadow .12s ease;
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+  }
+  .btn:active{transform:translateY(1px);}
+  .btn-primary{background:var(--amber); color:var(--amber-ink); font-weight:600;}
+  .btn-primary:hover{box-shadow:0 2px 0 0 rgba(0,0,0,0.08);}
+  .btn-primary:disabled{background:#E4E1D8; color:#A9A398; cursor:not-allowed;}
+  .btn-ghost{background:transparent; color:var(--ink-soft); padding:8px 4px;}
+  .btn-ghost:hover{color:var(--ink);}
+  .btn-outline{background:transparent; border:1px solid var(--line); color:var(--ink-soft);}
+  .btn-outline:hover{border-color:var(--ink-faint); color:var(--ink);}
+  .btn-danger-text{background:none;border:none;color:var(--coral);font-family:var(--font-mono);font-size:11px;letter-spacing:0.05em;cursor:pointer;padding:4px;}
+
+  .back-link{
+    font-family:var(--font-mono);
+    font-size:12px;
+    letter-spacing:0.05em;
+    color:var(--ink-soft);
+    background:none;
+    border:none;
+    cursor:pointer;
+    padding:0 0 18px;
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+  }
+  .back-link:hover{color:var(--ink);}
+
+  /* ---------- Panels / cards ---------- */
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:22px;
+  }
+  .panel + .panel{margin-top:18px;}
+
+  /* ---------- Home list ---------- */
+  .home-toolbar{display:flex; justify-content:flex-end; margin-bottom:16px;}
+  .poll-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:16px 18px;
+    margin-bottom:10px;
+    gap:14px;
+  }
+  .poll-row-main{min-width:0;}
+  .poll-row-title{font-family:var(--font-display); font-weight:600; font-size:16px; margin:0 0 4px;}
+  .poll-row-meta{font-family:var(--font-mono); font-size:11.5px; color:var(--ink-faint); letter-spacing:0.02em;}
+  .poll-row-actions{display:flex; align-items:center; gap:14px; flex-shrink:0;}
+  .empty-state{
+    text-align:center;
+    padding:48px 20px;
+    color:var(--ink-soft);
+    font-size:14.5px;
+    border:1px dashed var(--line);
+    border-radius:var(--radius);
+  }
+  .loading-text{font-family:var(--font-mono); font-size:12.5px; color:var(--ink-faint); padding:20px 0;}
+
+  /* ---------- Forms ---------- */
+  label.field-label{
+    display:block;
+    font-family:var(--font-mono);
+    font-size:11px;
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+    margin-bottom:6px;
+  }
+  .field{margin-bottom:20px;}
+  input[type=text], textarea{
+    width:100%;
+    font-family:var(--font-body);
+    font-size:15px;
+    color:var(--ink);
+    background:#FCFCFB;
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:11px 13px;
+    outline:none;
+  }
+  input[type=text]:focus, textarea:focus{border-color:var(--teal); background:#fff;}
+  textarea{resize:vertical; min-height:64px;}
+
+  /* ---------- Calendar ---------- */
+  .cal-wrap{display:flex; gap:22px; flex-wrap:wrap;}
+  .cal{width:280px; flex-shrink:0;}
+  .cal-nav{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;}
+  .cal-nav button{background:none;border:1px solid var(--line);border-radius:6px;width:28px;height:28px;cursor:pointer;font-family:var(--font-mono);color:var(--ink-soft);}
+  .cal-nav button:hover{border-color:var(--ink-faint); color:var(--ink);}
+  .cal-month{font-family:var(--font-display); font-weight:600; font-size:14.5px;}
+  .cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:4px;}
+  .cal-dow{font-family:var(--font-mono); font-size:10px; text-align:center; color:var(--ink-faint); padding-bottom:4px;}
+  .cal-day{
+    aspect-ratio:1;
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--font-mono); font-size:12.5px;
+    border-radius:6px;
+    cursor:pointer;
+    color:var(--ink);
+    border:1px solid transparent;
+  }
+  .cal-day:hover{border-color:var(--ink-faint);}
+  .cal-day.blank{cursor:default; visibility:hidden;}
+  .cal-day.past{color:var(--ink-faint); cursor:default;}
+  .cal-day.past:hover{border-color:transparent;}
+  .cal-day.selected{background:var(--amber); color:var(--amber-ink); font-weight:600; border-color:var(--amber);}
+
+  .selected-dates{flex:1; min-width:220px;}
+  .date-chip{
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:10px 12px;
+    margin-bottom:8px;
+  }
+  .date-chip-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;}
+  .date-chip-label{font-family:var(--font-mono); font-size:12.5px; font-weight:500;}
+  .date-chip-remove{background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:14px;line-height:1;}
+  .date-chip-remove:hover{color:var(--coral);}
+  .time-tags{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;}
+  .time-tag{
+    font-family:var(--font-mono); font-size:11.5px;
+    background:#F4F1EA; border:1px solid var(--line); border-radius:6px;
+    padding:4px 8px; display:flex; align-items:center; gap:6px;
+  }
+  .time-tag button{background:none;border:none;cursor:pointer;color:var(--ink-faint);font-size:12px;line-height:1;}
+  .time-add{display:flex; gap:6px;}
+  .time-add input{flex:1; font-size:12.5px; padding:7px 9px; font-family:var(--font-mono);}
+  .time-add button{
+    font-family:var(--font-mono); font-size:11px; background:var(--teal); color:var(--teal-ink);
+    border:none; border-radius:6px; padding:0 10px; cursor:pointer;
+  }
+  .no-dates-note{color:var(--ink-faint); font-size:13px; padding-top:6px;}
+
+  /* ---------- Poll view ---------- */
+  .poll-title{font-family:var(--font-display); font-size:24px; font-weight:700; margin:0 0 6px;}
+  .poll-desc{color:var(--ink-soft); font-size:14.5px; margin:0 0 4px; white-space:pre-wrap;}
+  .share-row{display:flex; align-items:center; gap:10px; margin-top:12px;}
+  .share-note{font-family:var(--font-mono); font-size:11px; color:var(--ink-faint);}
+
+  .section-label{font-family:var(--font-display); font-weight:600; font-size:15px; margin:0 0 4px;}
+  .section-sub{color:var(--ink-soft); font-size:13px; margin:0 0 16px;}
+
+  .name-row{display:flex; gap:10px; margin-bottom:18px; flex-wrap:wrap;}
+  .name-row input{flex:1; min-width:180px;}
+
+  .slot-row{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 0; border-bottom:1px solid var(--line);
+    gap:12px;
+  }
+  .slot-row:last-child{border-bottom:none;}
+  .slot-label{font-size:14px;}
+  .slot-label .time{color:var(--ink-soft); font-size:12.5px; font-family:var(--font-mono); display:block; margin-top:2px;}
+
+  .legend{font-family:var(--font-mono); font-size:11px; color:var(--ink-faint); margin-top:14px; letter-spacing:0.02em;}
+
+  .save-row{display:flex; align-items:center; gap:14px; margin-top:16px;}
+  .saved-flash{font-family:var(--font-mono); font-size:12px; color:var(--teal-ink); opacity:0; transition:opacity .25s ease;}
+  .saved-flash.show{opacity:1;}
+
+  /* ---------- Flip tile (the signature element) ---------- */
+  .tile{
+    width:38px; height:34px;
+    border-radius:6px;
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--font-mono); font-size:16px; font-weight:600;
+    background:var(--board-panel);
+    color:var(--ink-faint);
+    border:1px solid var(--board-line);
+    flex-shrink:0;
+    perspective:200px;
+  }
+  .tile.clickable{cursor:pointer;}
+  .tile.clickable:hover{border-color:var(--ink-faint);}
+  .tile.state-yes{background:var(--amber); color:var(--amber-ink); border-color:var(--amber); box-shadow:0 0 0 3px rgba(242,184,75,0.18);}
+  .tile.state-maybe{background:var(--teal); color:var(--teal-ink); border-color:var(--teal);}
+  .tile.state-no{background:#3A2A29; color:#E4B3AE; border-color:#4A3634;}
+  .tile.just-flipped{animation:flipIn .38s cubic-bezier(.3,1.4,.6,1);}
+  @keyframes flipIn{
+    0%{transform:rotateX(90deg); opacity:0.3;}
+    60%{transform:rotateX(-12deg); opacity:1;}
+    100%{transform:rotateX(0deg); opacity:1;}
+  }
+
+  /* ---------- Results board ---------- */
+  .board{
+    background:var(--board-bg);
+    border-radius:var(--radius);
+    padding:20px;
+    overflow-x:auto;
+    position:relative;
+  }
+  .board::before{
+    content:"";
+    position:absolute; inset:0;
+    background:repeating-linear-gradient(0deg, rgba(255,255,255,0.015) 0px, rgba(255,255,255,0.015) 1px, transparent 1px, transparent 3px);
+    border-radius:var(--radius);
+    pointer-events:none;
+  }
+  .board-head-row{display:flex; margin-bottom:2px;}
+  .board-name-col{
+    width:120px; flex-shrink:0;
+    font-family:var(--font-mono); font-size:10.5px; color:#8A93A3;
+    letter-spacing:0.05em; text-transform:uppercase;
+    display:flex; align-items:flex-end; padding-bottom:8px;
+    position:sticky; left:0; background:var(--board-bg); z-index:2;
+  }
+  .board-slot-head{
+    width:64px; flex-shrink:0; text-align:center; padding:0 3px 8px;
+    font-family:var(--font-mono); color:#C7CCD6; font-size:11px;
+  }
+  .board-slot-head .d{font-weight:600;}
+  .board-slot-head .t{color:#7C8698; font-size:9.5px; margin-top:2px;}
+  .board-body-row{display:flex; align-items:center; margin-bottom:6px;}
+  .board-name{
+    width:120px; flex-shrink:0; font-family:var(--font-body); font-size:13px; color:#E7EAF0;
+    padding-right:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    position:sticky; left:0; background:var(--board-bg); z-index:2;
+  }
+  .board-cell{width:64px; flex-shrink:0; display:flex; justify-content:center;}
+  .board-summary-row{border-top:1px solid var(--board-line); margin-top:6px; padding-top:10px;}
+  .board-summary-row .board-name{color:var(--amber); font-weight:600; font-size:12px;}
+  .top-slot-col .tile{box-shadow:0 0 0 2px var(--amber) inset;}
+
+  .callout{
+    font-family:var(--font-mono); font-size:12.5px; color:var(--ink-soft);
+    margin-top:14px; padding:12px 14px; background:#FBF8F1; border:1px solid var(--line); border-radius:8px;
+  }
+  .callout b{color:var(--ink); font-family:var(--font-display);}
+
+  @media (max-width:560px){
+    .app-title{font-size:26px;}
+    .cal{width:100%;}
+    .cal-wrap{flex-direction:column;}
+  }
+</style>
+</head>
+<body>
+<div id="app"><div class="loading-text">Loading board…</div></div>
+
+<script type="module">
+  // =====================================================================
+  // FIREBASE CONFIG — replace with your own project's config values.
+  // Get this from: Firebase Console → Project settings → General →
+  // "Your apps" → the web app (</>) → SDK setup and configuration.
+  // =====================================================================
+  const firebaseConfig = {
+    apiKey: "AIzaSyA_1L5VcUFEdLOMydYzW7iPxSWcoUyFeB8",
+    authDomain: "steering-committee-poll.firebaseapp.com",
+    projectId: "steering-committee-poll",
+    storageBucket: "steering-committee-poll.firebasestorage.app",
+    messagingSenderId: "84027974786",
+    appId: "1:84027974786:web:8f599e82bc7ad80187009b"
+  };
+  // =====================================================================
+
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import {
+    getFirestore, collection, doc, setDoc, getDoc, getDocs,
+    deleteDoc, query, where, onSnapshot
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const fbApp = initializeApp(firebaseConfig);
+  const db = getFirestore(fbApp);
+
+  "use strict";
+
+  // ---------------- State ----------------
+  var state = {
+    view: "home",          // home | create | poll
+    pollId: null,
+    polls: [],             // [{id, title, description, slots, createdAt}]
+    currentPoll: null,     // full poll object
+    responses: [],         // list of {name, availability, updatedAt, pollId}
+    calYear: new Date().getFullYear(),
+    calMonth: new Date().getMonth(),
+    selectedDates: {},      // dateStr -> [times]
+    yourName: "",
+    yourAvailability: {},   // slotId -> yes/maybe/no
+    justFlippedKey: null,   // for animating a single tile
+    savedFlash: false,
+    loading: true,
+    configOk: firebaseConfig.apiKey !== "REPLACE_ME"
+  };
+
+  var unsubPolls = null;
+  var unsubResponses = null;
+
+  var DOW = ["S","M","T","W","T","F","S"];
+  var MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+  // ---------------- Utils ----------------
+  function uid(){ return Math.random().toString(36).slice(2,9) + Date.now().toString(36).slice(-4); }
+  function escapeHtml(s){
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+    });
+  }
+  function slugify(name){
+    var s = String(name||"").trim().toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/(^-+|-+$)/g,"");
+    return s || "guest";
+  }
+  function pad(n){ return n<10 ? "0"+n : ""+n; }
+  function dateStr(y,m,d){ return y+"-"+pad(m+1)+"-"+pad(d); }
+  function todayStr(){ var t=new Date(); return dateStr(t.getFullYear(), t.getMonth(), t.getDate()); }
+  function formatDateLabel(ds){
+    var parts = ds.split("-").map(Number);
+    var d = new Date(parts[0], parts[1]-1, parts[2]);
+    var wd = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()];
+    return wd + ", " + MONTHS[d.getMonth()].slice(0,3) + " " + parts[2];
+  }
+  function glyph(v){
+    if(v==="yes") return "✓";
+    if(v==="maybe") return "~";
+    if(v==="no") return "✕";
+    return "—";
+  }
+  function nextState(v){
+    if(v==="yes") return "maybe";
+    if(v==="maybe") return "no";
+    if(v==="no") return "";
+    return "yes";
+  }
+
+  // ---------------- Firestore helpers ----------------
+  async function fsGetPoll(id){
+    try{
+      var snap = await getDoc(doc(db, "polls", id));
+      return snap.exists() ? snap.data() : null;
+    }catch(e){ console.error("fsGetPoll", e); return null; }
+  }
+  async function fsSetPoll(id, obj){
+    try{ await setDoc(doc(db, "polls", id), obj); return true; }
+    catch(e){ console.error("fsSetPoll", e); return false; }
+  }
+  async function fsDeletePoll(id){
+    try{ await deleteDoc(doc(db, "polls", id)); }catch(e){ console.error("fsDeletePoll", e); }
+  }
+  async function fsListPollsOnce(){
+    try{
+      var snap = await getDocs(collection(db, "polls"));
+      return snap.docs.map(function(d){ return d.data(); });
+    }catch(e){ console.error("fsListPollsOnce", e); return []; }
+  }
+  async function fsSaveResponse(pollId, slug, record){
+    try{ await setDoc(doc(db, "responses", pollId + "_" + slug), record); return true; }
+    catch(e){ console.error("fsSaveResponse", e); return false; }
+  }
+  async function fsDeleteResponsesForPoll(pollId){
+    try{
+      var snap = await getDocs(query(collection(db, "responses"), where("pollId","==",pollId)));
+      for(var i=0;i<snap.docs.length;i++){ await deleteDoc(snap.docs[i].ref); }
+    }catch(e){ console.error("fsDeleteResponsesForPoll", e); }
+  }
+
+  // ---------------- Live subscriptions ----------------
+  function subscribeHome(){
+    unsubscribeHome();
+    unsubPolls = onSnapshot(collection(db, "polls"), function(snap){
+      var polls = snap.docs.map(function(d){ return d.data(); });
+      polls.sort(function(a,b){ return (b.createdAt||0) - (a.createdAt||0); });
+      state.polls = polls;
+      state.loading = false;
+      if(state.view === "home") render();
+    }, function(err){
+      console.error("polls listener error", err);
+      state.loading = false;
+      render();
+    });
+  }
+  function unsubscribeHome(){
+    if(unsubPolls){ unsubPolls(); unsubPolls = null; }
+  }
+  function subscribeResponses(pollId){
+    unsubscribeResponses();
+    var q = query(collection(db, "responses"), where("pollId","==",pollId));
+    unsubResponses = onSnapshot(q, function(snap){
+      var responses = snap.docs.map(function(d){ return d.data(); });
+      responses.sort(function(a,b){ return (a.updatedAt||0)-(b.updatedAt||0); });
+      state.responses = responses;
+      if(state.view === "poll") renderResultsOnly();
+    }, function(err){ console.error("responses listener error", err); });
+  }
+  function unsubscribeResponses(){
+    if(unsubResponses){ unsubResponses(); unsubResponses = null; }
+  }
+
+  // ---------------- Data loading ----------------
+  function loadHome(){
+    state.loading = true;
+    state.view = "home";
+    unsubscribeResponses();
+    render();
+    subscribeHome();
+  }
+
+  async function loadPoll(id){
+    state.loading = true; state.view = "poll"; state.pollId = id; render();
+    unsubscribeHome();
+    var poll = await fsGetPoll(id);
+    state.currentPoll = poll;
+    state.loading = false;
+    render();
+    subscribeResponses(id);
+  }
+
+  // ---------------- Navigation ----------------
+  function goHome(){
+    state.currentPoll = null;
+    state.pollId = null;
+    state.yourName = "";
+    state.yourAvailability = {};
+    loadHome();
+  }
+  function goCreate(){
+    unsubscribeHome();
+    unsubscribeResponses();
+    state.view = "create";
+    var now = new Date();
+    state.calYear = now.getFullYear();
+    state.calMonth = now.getMonth();
+    state.selectedDates = {};
+    render();
+  }
+  function openPoll(id){
+    loadPoll(id);
+  }
+
+  // ---------------- Create-poll actions ----------------
+  function calPrevMonth(){
+    state.calMonth--;
+    if(state.calMonth<0){ state.calMonth=11; state.calYear--; }
+    render();
+  }
+  function calNextMonth(){
+    state.calMonth++;
+    if(state.calMonth>11){ state.calMonth=0; state.calYear++; }
+    render();
+  }
+  function toggleDate(ds){
+    if(state.selectedDates[ds]) delete state.selectedDates[ds];
+    else state.selectedDates[ds] = [];
+    render();
+  }
+  function removeDate(ds){
+    delete state.selectedDates[ds];
+    render();
+  }
+  function addTime(ds, value){
+    var v = (value||"").trim();
+    if(!v) return;
+    state.selectedDates[ds] = state.selectedDates[ds] || [];
+    state.selectedDates[ds].push(v);
+    render();
+  }
+  function removeTime(ds, idx){
+    state.selectedDates[ds].splice(idx,1);
+    render();
+  }
+
+  async function createPoll(){
+    var titleEl = document.getElementById("f-title");
+    var descEl = document.getElementById("f-desc");
+    var title = titleEl.value.trim();
+    var desc = descEl.value.trim();
+    var dates = Object.keys(state.selectedDates).sort();
+    if(!title || dates.length===0) return;
+
+    var slots = [];
+    dates.forEach(function(ds){
+      var times = state.selectedDates[ds];
+      if(!times || times.length===0){
+        slots.push({ id: uid(), date: ds, time: null });
+      }else{
+        times.forEach(function(t){
+          slots.push({ id: uid(), date: ds, time: t });
+        });
+      }
+    });
+
+    var id = uid();
+    var poll = {
+      id: id,
+      title: title,
+      description: desc,
+      slots: slots,
+      createdAt: Date.now()
+    };
+    var ok = await fsSetPoll(id, poll);
+    if(!ok){ alert("Couldn't save the poll — check the Firebase config and security rules."); return; }
+    openPoll(id);
+  }
+
+  async function deletePoll(id, ev){
+    if(ev) ev.stopPropagation();
+    if(!confirm("Delete this poll and all responses? This can't be undone.")) return;
+    await fsDeleteResponsesForPoll(id);
+    await fsDeletePoll(id);
+  }
+
+  // ---------------- Poll voting actions ----------------
+  function cycleYourSlot(slotId){
+    var cur = state.yourAvailability[slotId] || "";
+    var nxt = nextState(cur);
+    if(nxt) state.yourAvailability[slotId] = nxt;
+    else delete state.yourAvailability[slotId];
+    state.justFlippedKey = "yours:" + slotId;
+    render();
+  }
+
+  async function saveAvailability(){
+    var nameEl = document.getElementById("f-yourname");
+    var name = (nameEl ? nameEl.value : state.yourName || "").trim();
+    if(!name){ nameEl && nameEl.focus(); return; }
+    var slug = slugify(name);
+    var record = {
+      pollId: state.pollId,
+      name: name,
+      availability: state.yourAvailability,
+      updatedAt: Date.now()
+    };
+    var ok = await fsSaveResponse(state.pollId, slug, record);
+    if(!ok){ alert("Couldn't save your availability — check the Firebase config and security rules."); return; }
+    state.savedFlash = true;
+    render();
+    setTimeout(function(){ state.savedFlash = false; render(); }, 2200);
+  }
+
+  function loadExistingResponse(){
+    var nameEl = document.getElementById("f-yourname");
+    var name = nameEl ? nameEl.value.trim() : "";
+    if(!name) return;
+    var slug = slugify(name);
+    var existing = state.responses.filter(function(r){ return slugify(r.name) === slug; })[0];
+    if(existing){
+      state.yourAvailability = Object.assign({}, existing.availability);
+      render();
+    }
+  }
+
+  function copyShareText(){
+    var poll = state.currentPoll;
+    var msg = 'Please add your availability for "' + poll.title + '" — open the scheduling board and select it from the list.';
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(msg);
+    }
+    var btn = document.getElementById("share-btn");
+    if(btn){
+      var orig = btn.textContent;
+      btn.textContent = "Copied!";
+      setTimeout(function(){ btn.textContent = orig; }, 1600);
+    }
+  }
+
+  // ---------------- Scoring ----------------
+  function computeScores(){
+    var poll = state.currentPoll;
+    var scores = {};
+    poll.slots.forEach(function(s){ scores[s.id] = { yes:0, maybe:0, no:0, score:0 }; });
+    state.responses.forEach(function(r){
+      Object.keys(r.availability||{}).forEach(function(slotId){
+        if(!scores[slotId]) return;
+        var v = r.availability[slotId];
+        if(v==="yes"){ scores[slotId].yes++; scores[slotId].score += 1; }
+        else if(v==="maybe"){ scores[slotId].maybe++; scores[slotId].score += 0.5; }
+        else if(v==="no"){ scores[slotId].no++; }
+      });
+    });
+    var maxScore = 0;
+    Object.keys(scores).forEach(function(id){ if(scores[id].score > maxScore) maxScore = scores[id].score; });
+    var topSlotIds = [];
+    if(maxScore > 0){
+      Object.keys(scores).forEach(function(id){ if(scores[id].score === maxScore) topSlotIds.push(id); });
+    }
+    return { scores: scores, maxScore: maxScore, topSlotIds: topSlotIds };
+  }
+
+  // ---------------- Rendering ----------------
+  function render(){
+    var app = document.getElementById("app");
+    if(!state.configOk){
+      app.innerHTML = renderConfigWarning();
+      return;
+    }
+    app.innerHTML = renderHeader() + (
+      state.view === "home" ? renderHome() :
+      state.view === "create" ? renderCreate() :
+      renderPollView()
+    );
+    attachHandlers();
+    state.justFlippedKey = null;
+  }
+
+  function renderConfigWarning(){
+    return '<div class="empty-state">' +
+      '<p style="font-family:var(--font-display); font-weight:600; font-size:16px; margin:0 0 8px;">Firebase config needed</p>' +
+      '<p>This board can\'t connect yet — open the HTML file and replace the <code>firebaseConfig</code> placeholder near the top of the script with your own Firebase project\'s config values.</p>' +
+    '</div>';
+  }
+
+  function renderResultsOnly(){
+    var mount = document.getElementById("results-mount");
+    if(!mount) return;
+    mount.outerHTML = renderResultsBoard();
+    attachHandlers();
+  }
+
+  function renderHeader(){
+    var now = new Date();
+    var hh = now.getHours()%12 || 12;
+    var mm = pad(now.getMinutes());
+    var ampm = now.getHours()>=12 ? "PM":"AM";
+    return '' +
+    '<div class="app-header">' +
+      '<div>' +
+        '<p class="eyebrow">Steering Committee</p>' +
+        '<h1 class="app-title">Scheduling Board</h1>' +
+      '</div>' +
+      '<div class="board-clock"><span class="time">' + hh + ':' + mm + ' ' + ampm + '</span><br>' +
+        MONTHS[now.getMonth()].slice(0,3) + ' ' + now.getDate() + ', ' + now.getFullYear() +
+      '</div>' +
+    '</div>';
+  }
+
+  function renderHome(){
+    if(state.loading){
+      return '<div class="loading-text">Loading board…</div>';
+    }
+    var html = '<div class="home-toolbar"><button class="btn btn-primary" id="btn-new-poll">+ New Poll</button></div>';
+    if(state.polls.length === 0){
+      html += '<div class="empty-state">No polls yet. Create one to find a time that works for everyone.</div>';
+      return html;
+    }
+    state.polls.forEach(function(p){
+      html += '<div class="poll-row" data-open="' + p.id + '">' +
+        '<div class="poll-row-main">' +
+          '<p class="poll-row-title">' + escapeHtml(p.title) + '</p>' +
+          '<p class="poll-row-meta">' + p.slots.length + ' option' + (p.slots.length===1?'':'s') + ' · created ' + new Date(p.createdAt).toLocaleDateString() + '</p>' +
+        '</div>' +
+        '<div class="poll-row-actions">' +
+          '<button class="btn-danger-text" data-delete="' + p.id + '">Delete</button>' +
+          '<button class="btn btn-outline" data-open-btn="' + p.id + '">Open →</button>' +
+        '</div>' +
+      '</div>';
+    });
+    return html;
+  }
+
+  function renderCreate(){
+    var y = state.calYear, m = state.calMonth;
+    var firstDow = new Date(y,m,1).getDay();
+    var daysInMonth = new Date(y,m+1,0).getDate();
+    var today = todayStr();
+
+    var cells = '';
+    for(var i=0;i<firstDow;i++){ cells += '<div class="cal-day blank"></div>'; }
+    for(var d=1; d<=daysInMonth; d++){
+      var ds = dateStr(y,m,d);
+      var isPast = ds < today;
+      var isSelected = state.selectedDates.hasOwnProperty(ds);
+      cells += '<div class="cal-day ' + (isSelected?'selected':'') + (isPast?' past':'') + '" ' +
+        (isPast ? '' : 'data-day="' + ds + '"') + '>' + d + '</div>';
+    }
+
+    var dowHtml = DOW.map(function(d){ return '<div class="cal-dow">'+d+'</div>'; }).join('');
+
+    var sortedDates = Object.keys(state.selectedDates).sort();
+    var chipsHtml = '';
+    if(sortedDates.length===0){
+      chipsHtml = '<p class="no-dates-note">Pick one or more dates on the calendar. Add specific times if you want (optional) — otherwise the date is proposed as an all-day option.</p>';
+    }else{
+      sortedDates.forEach(function(ds){
+        var times = state.selectedDates[ds];
+        var tagsHtml = times.map(function(t,idx){
+          return '<span class="time-tag">' + escapeHtml(t) + '<button data-remove-time="' + ds + '|' + idx + '">✕</button></span>';
+        }).join('');
+        chipsHtml += '<div class="date-chip">' +
+          '<div class="date-chip-head">' +
+            '<span class="date-chip-label">' + formatDateLabel(ds) + '</span>' +
+            '<button class="date-chip-remove" data-remove-date="' + ds + '">✕</button>' +
+          '</div>' +
+          (tagsHtml ? '<div class="time-tags">' + tagsHtml + '</div>' : '') +
+          '<div class="time-add">' +
+            '<input type="text" placeholder="e.g. 2:00 PM (optional)" data-time-input="' + ds + '">' +
+            '<button data-add-time="' + ds + '">+ Time</button>' +
+          '</div>' +
+        '</div>';
+      });
+    }
+
+    return '' +
+    '<button class="back-link" id="btn-back-home">← Back to board</button>' +
+    '<div class="panel">' +
+      '<div class="field">' +
+        '<label class="field-label">Poll title</label>' +
+        '<input type="text" id="f-title" placeholder="e.g. Q3 Steering Committee Sync">' +
+      '</div>' +
+      '<div class="field">' +
+        '<label class="field-label">Description (optional)</label>' +
+        '<textarea id="f-desc" placeholder="Any context for the committee — agenda, duration, etc."></textarea>' +
+      '</div>' +
+      '<div class="field">' +
+        '<label class="field-label">Proposed dates &amp; times</label>' +
+        '<div class="cal-wrap">' +
+          '<div class="cal">' +
+            '<div class="cal-nav">' +
+              '<button id="cal-prev">←</button>' +
+              '<span class="cal-month">' + MONTHS[m] + ' ' + y + '</span>' +
+              '<button id="cal-next">→</button>' +
+            '</div>' +
+            '<div class="cal-grid">' + dowHtml + cells + '</div>' +
+          '</div>' +
+          '<div class="selected-dates">' + chipsHtml + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<button class="btn btn-primary" id="btn-create-poll">Create poll</button>' +
+    '</div>';
+  }
+
+  function renderPollView(){
+    if(state.loading || !state.currentPoll){
+      return '<button class="back-link" id="btn-back-home">← Back to board</button><div class="loading-text">Loading poll…</div>';
+    }
+    var poll = state.currentPoll;
+
+    var yourSlots = '';
+    poll.slots.forEach(function(s){
+      var v = state.yourAvailability[s.id] || "";
+      var key = "yours:" + s.id;
+      var justFlipped = state.justFlippedKey === key ? "just-flipped" : "";
+      yourSlots += '<div class="slot-row">' +
+        '<div class="slot-label">' + formatDateLabel(s.date) + (s.time ? '<span class="time">' + escapeHtml(s.time) + '</span>' : '<span class="time">All day</span>') + '</div>' +
+        '<div class="tile clickable state-' + (v||'none') + ' ' + justFlipped + '" data-your-slot="' + s.id + '">' + glyph(v) + '</div>' +
+      '</div>';
+    });
+
+    return '' +
+    '<button class="back-link" id="btn-back-home">← Back to board</button>' +
+    '<div class="panel">' +
+      '<h2 class="poll-title">' + escapeHtml(poll.title) + '</h2>' +
+      (poll.description ? '<p class="poll-desc">' + escapeHtml(poll.description) + '</p>' : '') +
+      '<div class="share-row">' +
+        '<button class="btn btn-outline" id="share-btn">Copy share message</button>' +
+        '<span class="share-note">Anyone with this page\'s link can see and add availability.</span>' +
+      '</div>' +
+    '</div>' +
+    '<div class="panel">' +
+      '<h3 class="section-label">Mark your availability</h3>' +
+      '<p class="section-sub">Enter your name, tap each option to cycle through yes / maybe / no, then save.</p>' +
+      '<div class="name-row">' +
+        '<input type="text" id="f-yourname" placeholder="Your name" value="' + escapeHtml(state.yourName) + '">' +
+      '</div>' +
+      yourSlots +
+      '<div class="legend">✓ yes &nbsp; ~ maybe &nbsp; ✕ no &nbsp; — no answer yet</div>' +
+      '<div class="save-row">' +
+        '<button class="btn btn-primary" id="btn-save-avail">Save availability</button>' +
+        '<span class="saved-flash ' + (state.savedFlash?'show':'') + '">Saved ✓</span>' +
+      '</div>' +
+    '</div>' +
+    renderResultsBoard();
+  }
+
+  function renderResultsBoard(){
+    var poll = state.currentPoll;
+    var respondentCount = state.responses.length;
+    var scoring = computeScores();
+
+    var headCells = poll.slots.map(function(s){
+      return '<div class="board-slot-head"><div class="d">' + formatDateLabel(s.date).replace(",", "") + '</div><div class="t">' + (s.time ? escapeHtml(s.time) : 'All day') + '</div></div>';
+    }).join('');
+
+    var bodyRows = '';
+    if(respondentCount === 0){
+      bodyRows = '<div style="font-family:var(--font-mono); font-size:12.5px; color:#8A93A3; padding:10px 0;">No responses yet — be the first to mark your availability above.</div>';
+    }else{
+      state.responses.forEach(function(r){
+        var cells = poll.slots.map(function(s){
+          var v = (r.availability||{})[s.id] || "";
+          var isTop = scoring.topSlotIds.indexOf(s.id) !== -1;
+          return '<div class="board-cell' + (isTop?' top-slot-col':'') + '"><div class="tile state-' + (v||'none') + '">' + glyph(v) + '</div></div>';
+        }).join('');
+        bodyRows += '<div class="board-body-row"><div class="board-name">' + escapeHtml(r.name) + '</div>' + cells + '</div>';
+      });
+
+      var summaryCells = poll.slots.map(function(s){
+        var sc = scoring.scores[s.id];
+        var isTop = scoring.topSlotIds.indexOf(s.id) !== -1;
+        return '<div class="board-cell' + (isTop?' top-slot-col':'') + '"><div class="tile" style="color:#C7CCD6;">' + sc.yes + '</div></div>';
+      }).join('');
+      bodyRows += '<div class="board-body-row board-summary-row"><div class="board-name">Yes count</div>' + summaryCells + '</div>';
+    }
+
+    var calloutHtml = '';
+    if(scoring.topSlotIds.length > 0){
+      var topSlot = poll.slots.filter(function(s){ return s.id === scoring.topSlotIds[0]; })[0];
+      var sc = scoring.scores[topSlot.id];
+      var tieNote = scoring.topSlotIds.length > 1 ? ' (' + scoring.topSlotIds.length + '-way tie — see highlighted columns)' : '';
+      calloutHtml = '<div class="callout">Top pick: <b>' + formatDateLabel(topSlot.date) + (topSlot.time ? ' · ' + escapeHtml(topSlot.time) : '') + '</b> — ' +
+        sc.yes + ' yes, ' + sc.maybe + ' maybe out of ' + respondentCount + ' response' + (respondentCount===1?'':'s') + tieNote + '</div>';
+    }
+
+    return '<div class="panel" id="results-mount">' +
+      '<h3 class="section-label">Group results</h3>' +
+      '<p class="section-sub">Updates live as people respond. ' + respondentCount + ' response' + (respondentCount===1?'':'s') + ' so far.</p>' +
+      '<div class="board">' +
+        '<div class="board-head-row"><div class="board-name-col">Name</div>' + headCells + '</div>' +
+        bodyRows +
+      '</div>' +
+      calloutHtml +
+    '</div>';
+  }
+
+  // ---------------- Event wiring ----------------
+  function attachHandlers(){
+    var app = document.getElementById("app");
+
+    var newPollBtn = document.getElementById("btn-new-poll");
+    if(newPollBtn) newPollBtn.onclick = goCreate;
+
+    var backBtn = document.getElementById("btn-back-home");
+    if(backBtn) backBtn.onclick = goHome;
+
+    app.querySelectorAll("[data-open]").forEach(function(el){
+      el.addEventListener("click", function(e){
+        if(e.target.closest("[data-delete]")) return;
+        openPoll(el.getAttribute("data-open"));
+      });
+    });
+    app.querySelectorAll("[data-open-btn]").forEach(function(el){
+      el.addEventListener("click", function(e){ e.stopPropagation(); openPoll(el.getAttribute("data-open-btn")); });
+    });
+    app.querySelectorAll("[data-delete]").forEach(function(el){
+      el.addEventListener("click", function(e){ deletePoll(el.getAttribute("data-delete"), e); });
+    });
+
+    // Calendar
+    var calPrev = document.getElementById("cal-prev");
+    if(calPrev) calPrev.onclick = calPrevMonth;
+    var calNext = document.getElementById("cal-next");
+    if(calNext) calNext.onclick = calNextMonth;
+    app.querySelectorAll("[data-day]").forEach(function(el){
+      el.addEventListener("click", function(){ toggleDate(el.getAttribute("data-day")); });
+    });
+    app.querySelectorAll("[data-remove-date]").forEach(function(el){
+      el.addEventListener("click", function(){ removeDate(el.getAttribute("data-remove-date")); });
+    });
+    app.querySelectorAll("[data-add-time]").forEach(function(el){
+      el.addEventListener("click", function(){
+        var ds = el.getAttribute("data-add-time");
+        var input = app.querySelector('[data-time-input="' + ds + '"]');
+        addTime(ds, input ? input.value : "");
+      });
+    });
+    app.querySelectorAll("[data-time-input]").forEach(function(el){
+      el.addEventListener("keydown", function(e){
+        if(e.key === "Enter"){
+          e.preventDefault();
+          var ds = el.getAttribute("data-time-input");
+          addTime(ds, el.value);
+        }
+      });
+    });
+    app.querySelectorAll("[data-remove-time]").forEach(function(el){
+      el.addEventListener("click", function(){
+        var parts = el.getAttribute("data-remove-time").split("|");
+        removeTime(parts[0], parseInt(parts[1],10));
+      });
+    });
+    var createBtn = document.getElementById("btn-create-poll");
+    if(createBtn) createBtn.onclick = createPoll;
+
+    // Poll view
+    var nameInput = document.getElementById("f-yourname");
+    if(nameInput){
+      nameInput.oninput = function(){ state.yourName = nameInput.value; };
+      nameInput.onblur = loadExistingResponse;
+    }
+    app.querySelectorAll("[data-your-slot]").forEach(function(el){
+      el.addEventListener("click", function(){ cycleYourSlot(el.getAttribute("data-your-slot")); });
+    });
+    var saveBtn = document.getElementById("btn-save-avail");
+    if(saveBtn) saveBtn.onclick = saveAvailability;
+    var shareBtn = document.getElementById("share-btn");
+    if(shareBtn) shareBtn.onclick = copyShareText;
+  }
+
+  // ---------------- Boot ----------------
+  render();
+  if(state.configOk){ loadHome(); }
+</script>
+</body>
+</html>
