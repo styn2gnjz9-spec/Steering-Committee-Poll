@@ -349,7 +349,6 @@
     background:var(--board-bg);
     border-radius:var(--radius);
     padding:20px;
-    overflow-x:auto;
     position:relative;
   }
   .board::before{
@@ -359,29 +358,37 @@
     border-radius:var(--radius);
     pointer-events:none;
   }
-  .board-head-row{display:flex; margin-bottom:2px;}
-  .board-name-col{
-    width:120px; flex-shrink:0;
+  .board-flex{display:flex; align-items:flex-start; position:relative;}
+  .board-names-col{width:110px; flex-shrink:0; padding-right:10px; margin-right:10px; border-right:1px solid var(--board-line);}
+  .board-names-head{
+    height:34px; display:flex; align-items:flex-end; padding-bottom:8px;
     font-family:var(--font-mono); font-size:10.5px; color:#8A93A3;
     letter-spacing:0.05em; text-transform:uppercase;
-    display:flex; align-items:flex-end; padding-bottom:8px;
-    position:sticky; left:0; background:var(--board-bg); z-index:2;
   }
+  .board-name-row{
+    height:34px; display:flex; align-items:center; margin-bottom:6px;
+    font-family:var(--font-body); font-size:13px; color:#E7EAF0;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .board-name-editable{cursor:pointer; text-decoration:underline; text-decoration-color:transparent; transition:text-decoration-color .12s ease, color .12s ease;}
+  .board-name-editable:hover{text-decoration-color:var(--amber); color:var(--amber);}
+  .board-edit-hint{font-family:var(--font-mono); font-size:11.5px; color:var(--ink-faint); margin:-10px 0 14px;}
+  .board-summary-name{color:var(--amber); font-weight:600; font-size:12px; border-top:1px solid var(--board-line); margin-top:6px; padding-top:10px; height:auto;}
+  .board-scroll-outer{
+    overflow-x:auto; flex:1; min-width:0;
+    -webkit-mask-image: linear-gradient(to right, transparent 0, black 14px, black calc(100% - 14px), transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0, black 14px, black calc(100% - 14px), transparent 100%);
+  }
+  .board-head-row{display:flex; margin-bottom:2px;}
   .board-slot-head{
     width:64px; flex-shrink:0; text-align:center; padding:0 3px 8px;
     font-family:var(--font-mono); color:#C7CCD6; font-size:11px;
   }
   .board-slot-head .d{font-weight:600;}
   .board-slot-head .t{color:#7C8698; font-size:9.5px; margin-top:2px;}
-  .board-body-row{display:flex; align-items:center; margin-bottom:6px;}
-  .board-name{
-    width:120px; flex-shrink:0; font-family:var(--font-body); font-size:13px; color:#E7EAF0;
-    padding-right:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-    position:sticky; left:0; background:var(--board-bg); z-index:2;
-  }
+  .board-cells-row{display:flex; align-items:center; margin-bottom:6px;}
   .board-cell{width:64px; flex-shrink:0; display:flex; justify-content:center;}
-  .board-summary-row{border-top:1px solid var(--board-line); margin-top:6px; padding-top:10px;}
-  .board-summary-row .board-name{color:var(--amber); font-weight:600; font-size:12px;}
+  .board-summary-cells{border-top:1px solid var(--board-line); margin-top:6px; padding-top:10px;}
   .top-slot-col .tile{box-shadow:0 0 0 2px var(--amber) inset;}
 
   .callout{
@@ -826,16 +833,28 @@
     showToast("Submitted!");
   }
 
-  function loadExistingResponse(){
+  function loadExistingResponse(nameOverride){
     var nameEl = document.getElementById("f-yourname");
-    var name = nameEl ? nameEl.value.trim() : "";
+    var name = (nameOverride != null) ? nameOverride : (nameEl ? nameEl.value.trim() : "");
     if(!name) return;
     var slug = slugify(name);
     var existing = state.responses.filter(function(r){ return slugify(r.name) === slug; })[0];
     if(existing){
       state.yourAvailability = Object.assign({}, existing.availability);
       render();
+      showToast("Loaded your previous answers — update and save again");
     }
+  }
+  function maybeLoadExistingResponse(){
+    // Don't overwrite answers the person has already started changing this session
+    if(Object.keys(state.yourAvailability).length > 0) return;
+    loadExistingResponse();
+  }
+  function editFromBoard(name){
+    state.yourName = name;
+    loadExistingResponse(name);
+    var freshNameEl = document.getElementById("f-yourname");
+    if(freshNameEl) freshNameEl.scrollIntoView({behavior:"smooth", block:"center"});
   }
 
   function copyShareText(){
@@ -897,7 +916,14 @@
     var mount = document.getElementById("results-mount");
     if(!mount) return;
     mount.outerHTML = renderResultsBoard();
-    attachHandlers();
+    attachResultsHandlers();
+  }
+  function attachResultsHandlers(){
+    var mount = document.getElementById("results-mount");
+    if(!mount) return;
+    mount.querySelectorAll("[data-edit-name]").forEach(function(el){
+      el.addEventListener("click", function(){ editFromBoard(el.getAttribute("data-edit-name")); });
+    });
   }
 
   function renderHeader(){
@@ -1139,30 +1165,37 @@
     var respondentCount = state.responses.length;
     var scoring = computeScores();
 
+    if(respondentCount === 0){
+      return '<div class="panel" id="results-mount">' +
+        '<h3 class="section-label">Group results</h3>' +
+        '<p class="section-sub">Updates live as people respond. 0 responses so far.</p>' +
+        '<div class="board"><div style="font-family:var(--font-mono); font-size:12.5px; color:#8A93A3;">No responses yet — be the first to mark your availability above.</div></div>' +
+      '</div>';
+    }
+
     var headCells = poll.slots.map(function(s){
       return '<div class="board-slot-head"><div class="d">' + formatDateLabel(s.date).replace(",", "") + '</div><div class="t">' + escapeHtml(formatSlotTime(s, poll)) + '</div></div>';
     }).join('');
 
-    var bodyRows = '';
-    if(respondentCount === 0){
-      bodyRows = '<div style="font-family:var(--font-mono); font-size:12.5px; color:#8A93A3; padding:10px 0;">No responses yet — be the first to mark your availability above.</div>';
-    }else{
-      state.responses.forEach(function(r){
-        var cells = poll.slots.map(function(s){
-          var v = (r.availability||{})[s.id] || "";
-          var isTop = scoring.topSlotIds.indexOf(s.id) !== -1;
-          return '<div class="board-cell' + (isTop?' top-slot-col':'') + '"><div class="tile state-' + (v||'none') + '">' + glyph(v) + '</div></div>';
-        }).join('');
-        bodyRows += '<div class="board-body-row"><div class="board-name">' + escapeHtml(r.name) + '</div>' + cells + '</div>';
-      });
-
-      var summaryCells = poll.slots.map(function(s){
-        var sc = scoring.scores[s.id];
+    var namesHtml = '';
+    var cellsHtml = '';
+    state.responses.forEach(function(r){
+      namesHtml += '<div class="board-name-row board-name-editable" data-edit-name="' + escapeHtml(r.name) + '">' + escapeHtml(r.name) + '</div>';
+      var cells = poll.slots.map(function(s){
+        var v = (r.availability||{})[s.id] || "";
         var isTop = scoring.topSlotIds.indexOf(s.id) !== -1;
-        return '<div class="board-cell' + (isTop?' top-slot-col':'') + '"><div class="tile" style="color:#C7CCD6;">' + sc.yes + '</div></div>';
+        return '<div class="board-cell' + (isTop?' top-slot-col':'') + '"><div class="tile state-' + (v||'none') + '">' + glyph(v) + '</div></div>';
       }).join('');
-      bodyRows += '<div class="board-body-row board-summary-row"><div class="board-name">Yes count</div>' + summaryCells + '</div>';
-    }
+      cellsHtml += '<div class="board-cells-row">' + cells + '</div>';
+    });
+
+    namesHtml += '<div class="board-name-row board-summary-name">Yes count</div>';
+    var summaryCells = poll.slots.map(function(s){
+      var sc = scoring.scores[s.id];
+      var isTop = scoring.topSlotIds.indexOf(s.id) !== -1;
+      return '<div class="board-cell' + (isTop?' top-slot-col':'') + '"><div class="tile" style="color:#C7CCD6;">' + sc.yes + '</div></div>';
+    }).join('');
+    cellsHtml += '<div class="board-cells-row board-summary-cells">' + summaryCells + '</div>';
 
     var calloutHtml = '';
     if(scoring.topSlotIds.length > 0){
@@ -1176,9 +1209,18 @@
     return '<div class="panel" id="results-mount">' +
       '<h3 class="section-label">Group results</h3>' +
       '<p class="section-sub">Updates live as people respond. ' + respondentCount + ' response' + (respondentCount===1?'':'s') + ' so far.</p>' +
+      '<p class="board-edit-hint">Click your name below to load and edit your answers.</p>' +
       '<div class="board">' +
-        '<div class="board-head-row"><div class="board-name-col">Name</div>' + headCells + '</div>' +
-        bodyRows +
+        '<div class="board-flex">' +
+          '<div class="board-names-col">' +
+            '<div class="board-names-head">Name</div>' +
+            namesHtml +
+          '</div>' +
+          '<div class="board-scroll-outer">' +
+            '<div class="board-head-row">' + headCells + '</div>' +
+            cellsHtml +
+          '</div>' +
+        '</div>' +
       '</div>' +
       calloutHtml +
     '</div>';
@@ -1284,8 +1326,8 @@
     // Poll view
     var nameInput = document.getElementById("f-yourname");
     if(nameInput){
-      nameInput.oninput = function(){ state.yourName = nameInput.value; };
-      nameInput.onblur = loadExistingResponse;
+      nameInput.oninput = function(){ state.yourName = nameInput.value; maybeLoadExistingResponse(); };
+      nameInput.onblur = function(){ setTimeout(maybeLoadExistingResponse, 0); };
     }
     app.querySelectorAll("[data-your-slot]").forEach(function(el){
       el.addEventListener("click", function(){
@@ -1296,6 +1338,9 @@
     if(saveBtn) saveBtn.onclick = saveAvailability;
     var shareBtn = document.getElementById("share-btn");
     if(shareBtn) shareBtn.onclick = copyShareText;
+    app.querySelectorAll("[data-edit-name]").forEach(function(el){
+      el.addEventListener("click", function(){ editFromBoard(el.getAttribute("data-edit-name")); });
+    });
   }
 
   // ---------------- Boot ----------------
