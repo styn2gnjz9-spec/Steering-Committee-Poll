@@ -133,6 +133,8 @@
   .btn-outline{background:transparent; border:1px solid var(--line); color:var(--ink-soft);}
   .btn-outline:hover{border-color:var(--ink-faint); color:var(--ink);}
   .btn-danger-text{background:none;border:none;color:var(--coral);font-family:var(--font-display);font-size:12.5px;font-weight:600;cursor:pointer;padding:4px;}
+  .btn-edit-text{background:none;border:none;color:var(--ink-soft);font-family:var(--font-display);font-size:12.5px;font-weight:600;cursor:pointer;padding:4px;}
+  .btn-edit-text:hover{color:var(--ink);}
 
   .back-link{
     font-family:var(--font-display);
@@ -513,6 +515,10 @@
     expandedDate: null,
     pendingDeleteId: null,
     pendingResetName: null,
+    pendingEditId: null,
+    editingPollId: null,
+    editTitleDraft: "",
+    editDescDraft: "",
     yourName: "",
     yourPinDraft: "",
     pinVerifiedFor: null,
@@ -880,9 +886,15 @@
     state.pendingResetName = name;
     render();
   }
+  function requestEditPoll(id, ev){
+    if(ev) ev.stopPropagation();
+    state.pendingEditId = id;
+    render();
+  }
   function cancelDeletePoll(){
     state.pendingDeleteId = null;
     state.pendingResetName = null;
+    state.pendingEditId = null;
     render();
   }
   async function confirmDeletePoll(){
@@ -899,6 +911,19 @@
       state.pendingResetName = null;
       await fsDeleteResponse(state.pollId, slugify(name));
       showToast(name + "'s response was reset");
+      render();
+      return;
+    }
+    if(state.pendingEditId){
+      var editId = state.pendingEditId;
+      state.pendingEditId = null;
+      var pollToEdit = state.polls.filter(function(p){ return p.id === editId; })[0] || await fsGetPoll(editId);
+      if(!pollToEdit){ showToast("Couldn't find that poll"); render(); return; }
+      state.editingPollId = editId;
+      state.editTitleDraft = pollToEdit.title || "";
+      state.editDescDraft = pollToEdit.description || "";
+      state.view = "editpoll";
+      unsubscribeHome();
       render();
       return;
     }
@@ -1039,8 +1064,9 @@
     app.innerHTML = renderHeader() + (
       state.view === "home" ? renderHome() :
       state.view === "create" ? renderCreate() :
+      state.view === "editpoll" ? renderEditPollView() :
       renderPollView()
-    ) + ((state.pendingDeleteId || state.pendingResetName) ? renderDeleteModal() : '');
+    ) + ((state.pendingDeleteId || state.pendingResetName || state.pendingEditId) ? renderDeleteModal() : '');
     attachHandlers();
     state.justFlippedKey = null;
     state.justFlippedValue = null;
@@ -1048,7 +1074,11 @@
 
   function renderDeleteModal(){
     var isReset = !!state.pendingResetName;
-    var title = isReset ? ('Enter password to reset ' + escapeHtml(state.pendingResetName) + '\'s response') : 'Enter password to delete this poll';
+    var isEdit = !!state.pendingEditId;
+    var title = isReset ? ('Enter password to reset ' + escapeHtml(state.pendingResetName) + '\'s response')
+      : isEdit ? 'Enter password to edit this poll'
+      : 'Enter password to delete this poll';
+    var confirmLabel = isReset ? 'Reset response' : isEdit ? 'Continue' : 'Delete poll';
     return '<div class="modal-backdrop" id="delete-modal-backdrop">' +
       '<div class="modal-box">' +
         '<h4 class="modal-title">' + title + '</h4>' +
@@ -1057,10 +1087,51 @@
         '<div class="modal-msg" id="delete-modal-msg"></div>' +
         '<div class="modal-actions">' +
           '<button class="btn btn-outline" id="delete-modal-cancel">Cancel</button>' +
-          '<button class="btn btn-primary" id="delete-modal-confirm">' + (isReset ? 'Reset response' : 'Delete poll') + '</button>' +
+          '<button class="btn btn-primary" id="delete-modal-confirm">' + confirmLabel + '</button>' +
         '</div>' +
       '</div>' +
     '</div>';
+  }
+
+  function renderEditPollView(){
+    return '' +
+    '<button class="back-link" id="btn-cancel-edit">← Back to board</button>' +
+    '<div class="panel">' +
+      '<h3 class="section-label">Edit poll details</h3>' +
+      '<div class="field">' +
+        '<label class="field-label">Poll title <span class="required-mark">*</span></label>' +
+        '<input type="text" id="f-edit-title" value="' + escapeHtml(state.editTitleDraft) + '">' +
+      '</div>' +
+      '<div class="field">' +
+        '<label class="field-label">Description (optional)</label>' +
+        '<textarea id="f-edit-desc">' + escapeHtml(state.editDescDraft) + '</textarea>' +
+      '</div>' +
+      '<p class="field-hint">Dates, times, and duration can\'t be changed here to avoid mismatching existing responses. Delete and recreate the poll if those need to change.</p>' +
+      '<button class="btn btn-primary" id="btn-save-edit">Save changes</button>' +
+      '<div class="form-msg" id="edit-form-msg"></div>' +
+    '</div>';
+  }
+
+  async function saveEditedPoll(){
+    var titleEl = document.getElementById("f-edit-title");
+    var descEl = document.getElementById("f-edit-desc");
+    var msgEl = document.getElementById("edit-form-msg");
+    var title = titleEl ? titleEl.value.trim() : "";
+    if(!title){
+      if(msgEl) msgEl.textContent = "Title can't be empty.";
+      if(titleEl) titleEl.focus();
+      return;
+    }
+    var id = state.editingPollId;
+    var existingPoll = state.polls.filter(function(p){ return p.id === id; })[0] || await fsGetPoll(id);
+    if(!existingPoll){ showToast("Couldn't find that poll"); return; }
+    var desc = descEl ? descEl.value.trim() : "";
+    var updated = Object.assign({}, existingPoll, { title: title, description: desc });
+    var ok = await fsSetPoll(id, updated);
+    if(!ok){ showToast("Couldn't save changes"); return; }
+    showToast("Poll updated!");
+    state.editingPollId = null;
+    goHome();
   }
 
   function renderConfigWarning(){
@@ -1134,6 +1205,7 @@
           '<p class="poll-row-meta">' + p.slots.length + ' option' + (p.slots.length===1?'':'s') + ' · created ' + new Date(p.createdAt).toLocaleDateString() + '</p>' +
         '</div>' +
         '<div class="poll-row-actions">' +
+          '<button class="btn-edit-text" data-edit-poll="' + p.id + '">Edit</button>' +
           '<button class="btn-danger-text" data-delete="' + p.id + '">Delete</button>' +
           '<button class="btn btn-primary btn-open" data-open-btn="' + p.id + '">Open →</button>' +
         '</div>' +
@@ -1433,6 +1505,9 @@
     app.querySelectorAll("[data-delete]").forEach(function(el){
       el.addEventListener("click", function(e){ requestDeletePoll(el.getAttribute("data-delete"), e); });
     });
+    app.querySelectorAll("[data-edit-poll]").forEach(function(el){
+      el.addEventListener("click", function(e){ requestEditPoll(el.getAttribute("data-edit-poll"), e); });
+    });
 
     // Calendar
     var calPrev = document.getElementById("cal-prev");
@@ -1507,6 +1582,15 @@
 
     var createBtn = document.getElementById("btn-create-poll");
     if(createBtn) createBtn.onclick = createPoll;
+
+    var editTitleInput = document.getElementById("f-edit-title");
+    if(editTitleInput) editTitleInput.oninput = function(){ state.editTitleDraft = editTitleInput.value; };
+    var editDescInput = document.getElementById("f-edit-desc");
+    if(editDescInput) editDescInput.oninput = function(){ state.editDescDraft = editDescInput.value; };
+    var cancelEditBtn = document.getElementById("btn-cancel-edit");
+    if(cancelEditBtn) cancelEditBtn.onclick = function(){ state.editingPollId = null; goHome(); };
+    var saveEditBtn = document.getElementById("btn-save-edit");
+    if(saveEditBtn) saveEditBtn.onclick = saveEditedPoll;
 
     // Poll view
     var nameInput = document.getElementById("f-yourname");
