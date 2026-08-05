@@ -610,7 +610,7 @@
     var h = Math.floor(mins/60), m = mins%60;
     var ap = h>=12 ? "PM":"AM";
     var h12 = h%12; if(h12===0) h12=12;
-    return h12 + ":" + pad(m) + " " + ap;
+    return h12 + ":" + pad(m) + "\u00A0" + ap;
   }
   function formatSlotTime(slot, poll){
     if(!slot.time) return "All day";
