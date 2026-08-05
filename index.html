@@ -395,13 +395,13 @@
   .board-flex{display:flex; align-items:flex-start; position:relative;}
   .board-names-col{width:110px; flex-shrink:0; padding-right:10px; margin-right:10px; border-right:1px solid var(--board-line);}
   .board-names-head{
-    height:44px; margin-bottom:2px; box-sizing:border-box;
+    height:54px; margin-bottom:2px; box-sizing:border-box;
     display:flex; align-items:flex-start; padding-top:2px;
     font-family:var(--font-mono); font-size:10.5px; color:#8A93A3;
     letter-spacing:0.05em; text-transform:uppercase;
   }
   .board-name-row{
-    height:40px; box-sizing:border-box; display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:6px;
+    height:54px; box-sizing:border-box; display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:6px;
     font-family:var(--font-body); font-size:13px; color:#E7EAF0;
   }
   .board-name-row > .board-name-editable{overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;}
@@ -421,14 +421,14 @@
   }
   .board-head-row{display:flex; margin-bottom:2px;}
   .board-slot-head{
-    width:64px; flex-shrink:0; text-align:center; padding:2px 3px 0;
-    height:44px; box-sizing:border-box; display:flex; flex-direction:column; justify-content:flex-start;
+    width:76px; flex-shrink:0; text-align:center; padding:2px 4px 0;
+    height:54px; box-sizing:border-box; display:flex; flex-direction:column; justify-content:flex-start;
     font-family:var(--font-mono); color:#C7CCD6; font-size:11px;
   }
-  .board-slot-head .d{font-weight:600;}
-  .board-slot-head .t{color:#7C8698; font-size:9.5px; margin-top:2px;}
-  .board-cells-row{height:40px; box-sizing:border-box; display:flex; align-items:center; margin-bottom:6px;}
-  .board-cell{width:64px; flex-shrink:0; display:flex; justify-content:center;}
+  .board-slot-head .d{font-weight:600; white-space:nowrap;}
+  .board-slot-head .t{color:#7C8698; font-size:9.5px; margin-top:2px; line-height:1.25;}
+  .board-cells-row{height:54px; box-sizing:border-box; display:flex; align-items:center; margin-bottom:6px;}
+  .board-cell{width:76px; flex-shrink:0; display:flex; justify-content:center;}
   .board-summary-cells{border-top:1px solid var(--board-line); margin-top:6px; padding-top:10px;}
   .top-slot-col .tile{box-shadow:0 0 0 2px var(--amber) inset;}
 
