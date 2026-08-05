@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Scheduling Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@500;600;700;800&family=Red+Hat+Text:wght@400;500;600&family=Red+Hat+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root{
     /* ===== Heartland MPO brand palette (sampled from logo) ===== */
@@ -28,8 +28,8 @@
     /* ============================================================================= */
     --radius: 12px;
     --font-display: 'Red Hat Display', sans-serif;
-    --font-body: 'Red Hat Text', sans-serif;
-    --font-mono: 'Red Hat Mono', monospace;
+    --font-body: 'Red Hat Display', sans-serif;
+    --font-mono: 'Red Hat Display', sans-serif;
   }
   *{box-sizing:border-box;}
   body{
@@ -69,18 +69,16 @@
 
   /* ---------- Header ---------- */
   .app-header{
-    display:flex;
-    justify-content:space-between;
-    align-items:flex-end;
+    position:relative;
+    text-align:center;
     margin-bottom:28px;
-    flex-wrap:wrap;
-    gap:12px;
+    padding-top:8px;
   }
   .brand-logo{
-    height:34px;
+    height:88px;
     width:auto;
     display:block;
-    margin-bottom:12px;
+    margin:0 auto 16px;
   }
   .eyebrow{
     font-family:var(--font-mono);
@@ -98,6 +96,9 @@
     letter-spacing:-0.01em;
   }
   .board-clock{
+    position:absolute;
+    top:8px;
+    right:0;
     font-family:var(--font-mono);
     font-size:13px;
     color:var(--ink-soft);
@@ -440,6 +441,8 @@
     .app-title{font-size:26px;}
     .cal{width:100%;}
     .cal-wrap{flex-direction:column;}
+    .app-header{padding-top:64px;}
+    .board-clock{top:0; right:0; left:0; text-align:center;}
   }
 </style>
 </head>
@@ -1099,14 +1102,12 @@
     var ampm = now.getHours()>=12 ? "PM":"AM";
     return '' +
     '<div class="app-header">' +
-      '<div>' +
-        '<img class="brand-logo" src="' + LOGO_SRC + '" alt="Heartland MPO">' +
-        '<p class="eyebrow">Steering Committee</p>' +
-        '<h1 class="app-title">Scheduling Board</h1>' +
-      '</div>' +
       '<div class="board-clock"><span class="time">' + hh + ':' + mm + ' ' + ampm + '</span><br>' +
         MONTHS[now.getMonth()].slice(0,3) + ' ' + now.getDate() + ', ' + now.getFullYear() +
       '</div>' +
+      '<img class="brand-logo" src="' + LOGO_SRC + '" alt="Heartland MPO">' +
+      '<p class="eyebrow">Steering Committee</p>' +
+      '<h1 class="app-title">Scheduling Board</h1>' +
     '</div>';
   }
 
