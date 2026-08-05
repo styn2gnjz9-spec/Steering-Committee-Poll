@@ -517,6 +517,7 @@
     pendingResetName: null,
     pendingEditId: null,
     pendingNewPoll: false,
+    viaDirectLink: false,
     editingPollId: null,
     editTitleDraft: "",
     editDescDraft: "",
@@ -1374,7 +1375,7 @@
 
   function renderPollView(){
     if(state.loading || !state.currentPoll){
-      return '<button class="back-link" id="btn-back-home">← Back to board</button><div class="loading-text">Loading poll…</div>';
+      return (state.viaDirectLink ? '' : '<button class="back-link" id="btn-back-home">← Back to board</button>') + '<div class="loading-text">Loading poll…</div>';
     }
     var poll = state.currentPoll;
     var locked = currentEditIsLocked();
@@ -1394,7 +1395,7 @@
     });
 
     return '' +
-    '<button class="back-link" id="btn-back-home">← Back to board</button>' +
+    (state.viaDirectLink ? '' : '<button class="back-link" id="btn-back-home">← Back to board</button>') +
     '<div class="panel">' +
       '<h2 class="poll-title">' + escapeHtml(poll.title) + '</h2>' +
       (poll.description ? '<p class="poll-desc">' + escapeHtml(poll.description) + '</p>' : '') +
@@ -1684,6 +1685,7 @@
   if(state.configOk){
     var hashMatch = location.hash.match(/^#poll=(.+)$/);
     if(hashMatch){
+      state.viaDirectLink = true;
       openPoll(decodeURIComponent(hashMatch[1]));
     }else{
       loadHome();
