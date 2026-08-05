@@ -72,11 +72,12 @@
     position:relative;
     text-align:center;
     margin-bottom:28px;
-    padding-top:8px;
   }
   .brand-logo{
-    height:88px;
+    max-height:88px;
+    max-width:100%;
     width:auto;
+    height:auto;
     display:block;
     margin:0 auto 16px;
   }
@@ -96,14 +97,12 @@
     letter-spacing:-0.01em;
   }
   .board-clock{
-    position:absolute;
-    top:8px;
-    right:0;
     font-family:var(--font-mono);
     font-size:13px;
     color:var(--ink-soft);
-    text-align:right;
+    text-align:center;
     line-height:1.5;
+    margin-top:8px;
   }
   .board-clock .time{
     font-size:20px;
@@ -441,8 +440,7 @@
     .app-title{font-size:26px;}
     .cal{width:100%;}
     .cal-wrap{flex-direction:column;}
-    .app-header{padding-top:64px;}
-    .board-clock{top:0; right:0; left:0; text-align:center;}
+    .brand-logo{max-height:56px;}
   }
 </style>
 </head>
@@ -1102,12 +1100,10 @@
     var ampm = now.getHours()>=12 ? "PM":"AM";
     return '' +
     '<div class="app-header">' +
-      '<div class="board-clock"><span class="time">' + hh + ':' + mm + ' ' + ampm + '</span><br>' +
+      '<img class="brand-logo" src="' + LOGO_SRC + '" alt="Heartland MPO">' +
+      '<div class="board-clock"><span class="time">' + hh + ':' + mm + ' ' + ampm + '</span> · ' +
         MONTHS[now.getMonth()].slice(0,3) + ' ' + now.getDate() + ', ' + now.getFullYear() +
       '</div>' +
-      '<img class="brand-logo" src="' + LOGO_SRC + '" alt="Heartland MPO">' +
-      '<p class="eyebrow">Steering Committee</p>' +
-      '<h1 class="app-title">Scheduling Board</h1>' +
     '</div>';
   }
 
