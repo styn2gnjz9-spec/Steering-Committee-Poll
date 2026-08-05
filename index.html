@@ -335,6 +335,25 @@
     border-radius:8px; padding:9px 16px; cursor:pointer; display:flex; align-items:center; gap:6px;
   }
   .yn-btn:hover{border-color:var(--ink-faint);}
+  .yn-btn:disabled{opacity:0.45; cursor:not-allowed;}
+  .yn-btn:disabled:hover{border-color:var(--line);}
+  .lock-hint{color:var(--no); font-weight:600;}
+  .pin-boxes{display:flex; gap:10px;}
+  .pin-box{
+    width:48px; height:52px; text-align:center;
+    font-family:var(--font-mono); font-size:22px; font-weight:600; letter-spacing:0;
+    color:var(--ink); background:#FCFCFB; border:1px solid var(--line); border-radius:8px;
+    outline:none; padding:0;
+  }
+  .pin-box:focus{border-color:var(--amber); background:#fff;}
+  @keyframes pinShake{
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-8px); }
+    40% { transform: translateX(8px); }
+    60% { transform: translateX(-6px); }
+    80% { transform: translateX(6px); }
+  }
+  .pin-boxes.shake .pin-box{ animation: pinShake 0.4s ease; border-color: var(--no); }
   .yn-btn.yes.active{background:var(--yes); border-color:var(--yes); color:var(--yes-ink);}
   .yn-btn.no.active{background:var(--no); border-color:var(--no); color:var(--no-ink);}
   .yn-btn.just-set{animation:popIn .22s ease;}
@@ -380,12 +399,17 @@
     letter-spacing:0.05em; text-transform:uppercase;
   }
   .board-name-row{
-    height:34px; box-sizing:border-box; display:flex; align-items:center; margin-bottom:6px;
+    height:34px; box-sizing:border-box; display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:6px;
     font-family:var(--font-body); font-size:13px; color:#E7EAF0;
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   }
+  .board-name-row > .board-name-editable{overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;}
   .board-name-editable{cursor:pointer; text-decoration:underline; text-decoration-color:transparent; transition:text-decoration-color .12s ease, color .12s ease;}
   .board-name-editable:hover{text-decoration-color:var(--amber); color:var(--amber);}
+  .board-name-reset{
+    flex-shrink:0; background:none; border:none; color:#8A93A3; cursor:pointer;
+    font-size:13px; line-height:1; padding:2px 4px; opacity:0.7;
+  }
+  .board-name-reset:hover{color:var(--no); opacity:1;}
   .board-edit-hint{font-family:var(--font-mono); font-size:11.5px; color:var(--ink-faint); margin:-10px 0 14px;}
   .board-summary-name{color:var(--amber); font-weight:600; font-size:12px; border-top:1px solid var(--board-line); margin-top:6px; padding-top:10px; height:auto;}
   .board-scroll-outer{
@@ -487,7 +511,10 @@
     dateOverrides: {},        // dateStr -> { active: {time:true}, custom: [times] }
     expandedDate: null,
     pendingDeleteId: null,
+    pendingResetName: null,
     yourName: "",
+    yourPinDraft: "",
+    pinVerifiedFor: null,
     titleDraft: "",
     descDraft: "",
     yourAvailability: {},     // slotId -> yes/no
@@ -514,6 +541,17 @@
   function slugify(name){
     var s = String(name||"").trim().toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/(^-+|-+$)/g,"");
     return s || "guest";
+  }
+  function findExistingResponse(name){
+    var slug = slugify(name);
+    return state.responses.filter(function(r){ return slugify(r.name) === slug; })[0];
+  }
+  function currentEditIsLocked(){
+    var name = (state.yourName || "").trim();
+    if(!name) return false;
+    var existing = findExistingResponse(name);
+    if(!existing || !existing.pin) return false;
+    return state.pinVerifiedFor !== slugify(name);
   }
   function pad(n){ return n<10 ? "0"+n : ""+n; }
   function dateStr(y,m,d){ return y+"-"+pad(m+1)+"-"+pad(d); }
@@ -612,6 +650,9 @@
       for(var i=0;i<snap.docs.length;i++){ await deleteDoc(snap.docs[i].ref); }
     }catch(e){ console.error("fsDeleteResponsesForPoll", e); }
   }
+  async function fsDeleteResponse(pollId, slug){
+    try{ await deleteDoc(doc(db, "responses", pollId + "_" + slug)); }catch(e){ console.error("fsDeleteResponse", e); }
+  }
 
   // ---------------- Live subscriptions ----------------
   function subscribeHome(){
@@ -668,6 +709,8 @@
     state.currentPoll = null;
     state.pollId = null;
     state.yourName = "";
+    state.yourPinDraft = "";
+    state.pinVerifiedFor = null;
     state.yourAvailability = {};
     loadHome();
   }
@@ -820,8 +863,14 @@
     state.pendingDeleteId = id;
     render();
   }
+  function requestResetResponse(name, ev){
+    if(ev) ev.stopPropagation();
+    state.pendingResetName = name;
+    render();
+  }
   function cancelDeletePoll(){
     state.pendingDeleteId = null;
+    state.pendingResetName = null;
     render();
   }
   async function confirmDeletePoll(){
@@ -831,6 +880,14 @@
     if(entered !== DELETE_PASSWORD){
       if(msgEl) msgEl.textContent = "Incorrect password.";
       if(input){ input.value = ""; input.focus(); }
+      return;
+    }
+    if(state.pendingResetName){
+      var name = state.pendingResetName;
+      state.pendingResetName = null;
+      await fsDeleteResponse(state.pollId, slugify(name));
+      showToast(name + "'s response was reset");
+      render();
       return;
     }
     var id = state.pendingDeleteId;
@@ -843,6 +900,10 @@
 
   // ---------------- Poll voting actions ----------------
   function setYourSlot(slotId, value){
+    if(currentEditIsLocked()){
+      showToast("Enter the PIN to edit this response");
+      return;
+    }
     var cur = state.yourAvailability[slotId] || "";
     if(cur === value){
       delete state.yourAvailability[slotId];
@@ -859,22 +920,44 @@
     var nameEl = document.getElementById("f-yourname");
     var msgEl = document.getElementById("avail-form-msg");
     var name = (nameEl ? nameEl.value : state.yourName || "").trim();
+    var pin = (state.yourPinDraft || "").trim();
     if(!name){
       if(msgEl) msgEl.textContent = "Enter your name before saving.";
       if(nameEl) nameEl.focus();
       return;
     }
-    if(msgEl) msgEl.textContent = "";
+    if(!/^[0-9]{4}$/.test(pin)){
+      if(msgEl) msgEl.textContent = "Enter a 4-digit PIN before saving.";
+      var firstBox = document.querySelector('.pin-box[data-pin-idx="0"]');
+      if(firstBox) firstBox.focus();
+      return;
+    }
     var slug = slugify(name);
+    var existing = state.responses.filter(function(r){ return slugify(r.name) === slug; })[0];
+    if(existing && existing.pin && existing.pin !== pin){
+      if(msgEl) msgEl.textContent = "Incorrect PIN for this name.";
+      triggerIncorrectPinFeedback();
+      setTimeout(function(){
+        state.yourPinDraft = "";
+        render();
+        var resetFirstBox = document.querySelector('.pin-box[data-pin-idx="0"]');
+        if(resetFirstBox) resetFirstBox.focus();
+      }, 380);
+      return;
+    }
+    if(msgEl) msgEl.textContent = "";
     var record = {
       pollId: state.pollId,
       name: name,
+      pin: pin,
       availability: state.yourAvailability,
       updatedAt: Date.now()
     };
     var ok = await fsSaveResponse(state.pollId, slug, record);
     if(!ok){ showToast("Couldn't save — try again"); return; }
-    showToast("Submitted!");
+    showToast((existing && !existing.pin) ? "Submitted! PIN set — this response is now protected" : "Submitted!");
+    state.yourPinDraft = "";
+    render();
   }
 
   function loadExistingResponse(nameOverride){
@@ -885,8 +968,10 @@
     var existing = state.responses.filter(function(r){ return slugify(r.name) === slug; })[0];
     if(existing){
       state.yourAvailability = Object.assign({}, existing.availability);
+      state.yourPinDraft = "";
+      if(state.pinVerifiedFor !== slug) state.pinVerifiedFor = null;
       render();
-      showToast("Loaded your previous answers — update and save again");
+      showToast(existing.pin ? "Loaded — enter the PIN to unlock editing" : "Loaded your previous answers — update and save again");
     }
   }
   function maybeLoadExistingResponse(){
@@ -943,21 +1028,24 @@
       state.view === "home" ? renderHome() :
       state.view === "create" ? renderCreate() :
       renderPollView()
-    ) + (state.pendingDeleteId ? renderDeleteModal() : '');
+    ) + ((state.pendingDeleteId || state.pendingResetName) ? renderDeleteModal() : '');
     attachHandlers();
     state.justFlippedKey = null;
     state.justFlippedValue = null;
   }
 
   function renderDeleteModal(){
+    var isReset = !!state.pendingResetName;
+    var title = isReset ? ('Enter password to reset ' + escapeHtml(state.pendingResetName) + '\'s response') : 'Enter password to delete this poll';
     return '<div class="modal-backdrop" id="delete-modal-backdrop">' +
       '<div class="modal-box">' +
-        '<h4 class="modal-title">Enter password to delete this poll</h4>' +
+        '<h4 class="modal-title">' + title + '</h4>' +
+        (isReset ? '<p class="field-hint">This clears their saved answers and PIN so they can submit fresh.</p>' : '') +
         '<input type="password" id="delete-password-input" placeholder="Password">' +
         '<div class="modal-msg" id="delete-modal-msg"></div>' +
         '<div class="modal-actions">' +
           '<button class="btn btn-outline" id="delete-modal-cancel">Cancel</button>' +
-          '<button class="btn btn-primary" id="delete-modal-confirm">Delete poll</button>' +
+          '<button class="btn btn-primary" id="delete-modal-confirm">' + (isReset ? 'Reset response' : 'Delete poll') + '</button>' +
         '</div>' +
       '</div>' +
     '</div>';
@@ -968,6 +1056,23 @@
       '<p style="font-family:var(--font-display); font-weight:700; font-size:16px; margin:0 0 8px;">Firebase config needed</p>' +
       '<p>Open the HTML file and replace the <code>firebaseConfig</code> placeholder with your Firebase project\'s config values.</p>' +
     '</div>';
+  }
+
+  function renderPinBoxes(){
+    var val = state.yourPinDraft || "";
+    var boxes = "";
+    for(var i=0;i<4;i++){
+      boxes += '<input type="password" class="pin-box" maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="off" data-pin-idx="' + i + '" value="' + escapeHtml(val.charAt(i) || "") + '">';
+    }
+    return '<div class="pin-boxes" id="pin-boxes">' + boxes + '</div>';
+  }
+  function triggerIncorrectPinFeedback(){
+    var boxesEl = document.getElementById("pin-boxes");
+    if(boxesEl){
+      boxesEl.classList.remove("shake");
+      void boxesEl.offsetWidth;
+      boxesEl.classList.add("shake");
+    }
   }
 
   function renderResultsOnly(){
@@ -981,6 +1086,9 @@
     if(!mount) return;
     mount.querySelectorAll("[data-edit-name]").forEach(function(el){
       el.addEventListener("click", function(){ editFromBoard(el.getAttribute("data-edit-name")); });
+    });
+    mount.querySelectorAll("[data-reset-response]").forEach(function(el){
+      el.addEventListener("click", function(e){ requestResetResponse(el.getAttribute("data-reset-response"), e); });
     });
   }
 
@@ -1176,6 +1284,7 @@
       return '<button class="back-link" id="btn-back-home">← Back to board</button><div class="loading-text">Loading poll…</div>';
     }
     var poll = state.currentPoll;
+    var locked = currentEditIsLocked();
 
     var yourSlots = '';
     poll.slots.forEach(function(s){
@@ -1185,8 +1294,8 @@
       yourSlots += '<div class="slot-row">' +
         '<div class="slot-label">' + formatDateLabel(s.date) + '<span class="time">' + escapeHtml(formatSlotTime(s, poll)) + '</span></div>' +
         '<div class="yn-group">' +
-          '<button class="yn-btn yes ' + (v==='yes'?'active':'') + ' ' + justYes + '" data-your-slot="' + s.id + '" data-value="yes">✓ Yes</button>' +
-          '<button class="yn-btn no ' + (v==='no'?'active':'') + ' ' + justNo + '" data-your-slot="' + s.id + '" data-value="no">✕ No</button>' +
+          '<button class="yn-btn yes ' + (v==='yes'?'active':'') + ' ' + justYes + '" data-your-slot="' + s.id + '" data-value="yes"' + (locked?' disabled':'') + '>✓ Yes</button>' +
+          '<button class="yn-btn no ' + (v==='no'?'active':'') + ' ' + justNo + '" data-your-slot="' + s.id + '" data-value="no"' + (locked?' disabled':'') + '>✕ No</button>' +
         '</div>' +
       '</div>';
     });
@@ -1207,6 +1316,13 @@
       '<div class="field name-row">' +
         '<label class="field-label">Your name <span class="required-mark">*</span></label>' +
         '<input type="text" id="f-yourname" placeholder="Your name" value="' + escapeHtml(state.yourName) + '">' +
+      '</div>' +
+      '<div class="field">' +
+        '<label class="field-label">PIN <span class="required-mark">*</span></label>' +
+        (locked
+          ? '<p class="field-hint lock-hint">🔒 This response is protected — enter its PIN to unlock editing.</p>'
+          : '<p class="field-hint">Set this the first time you save — you\'ll need the same 4-digit PIN to edit your answers later. Everyone can still see results either way.</p>') +
+        renderPinBoxes() +
       '</div>' +
       yourSlots +
       '<div class="legend">✓ yes &nbsp; ✕ no &nbsp; — no answer yet</div>' +
@@ -1238,7 +1354,10 @@
     var namesHtml = '';
     var cellsHtml = '';
     state.responses.forEach(function(r){
-      namesHtml += '<div class="board-name-row board-name-editable" data-edit-name="' + escapeHtml(r.name) + '">' + escapeHtml(r.name) + '</div>';
+      namesHtml += '<div class="board-name-row">' +
+        '<span class="board-name-editable" data-edit-name="' + escapeHtml(r.name) + '">' + escapeHtml(r.name) + '</span>' +
+        '<button class="board-name-reset" data-reset-response="' + escapeHtml(r.name) + '" title="Reset this response">↺</button>' +
+      '</div>';
       var cells = poll.slots.map(function(s){
         var v = (r.availability||{})[s.id] || "";
         var isTop = scoring.topSlotIds.indexOf(s.id) !== -1;
@@ -1387,6 +1506,43 @@
       nameInput.oninput = function(){ state.yourName = nameInput.value; maybeLoadExistingResponse(); };
       nameInput.onblur = function(){ setTimeout(maybeLoadExistingResponse, 0); };
     }
+    var pinBoxes = app.querySelectorAll(".pin-box");
+    if(pinBoxes.length){
+      pinBoxes.forEach(function(box, idx){
+        box.addEventListener("input", function(){
+          box.value = box.value.replace(/[^0-9]/g, "").slice(-1);
+          var chars = [];
+          pinBoxes.forEach(function(b){ chars.push(b.value || ""); });
+          state.yourPinDraft = chars.join("");
+          if(box.value && idx < pinBoxes.length - 1){
+            pinBoxes[idx+1].focus();
+          }
+          var name = (state.yourName || "").trim();
+          if(name){
+            var existing = findExistingResponse(name);
+            var slug = slugify(name);
+            if(existing && existing.pin && existing.pin === state.yourPinDraft && state.pinVerifiedFor !== slug){
+              state.pinVerifiedFor = slug;
+              render();
+              showToast("PIN verified — you can now edit your answers");
+            }else if(existing && existing.pin && state.yourPinDraft.length === 4 && existing.pin !== state.yourPinDraft){
+              triggerIncorrectPinFeedback();
+              setTimeout(function(){
+                state.yourPinDraft = "";
+                render();
+                var firstBox = document.querySelector('.pin-box[data-pin-idx="0"]');
+                if(firstBox) firstBox.focus();
+              }, 380);
+            }
+          }
+        });
+        box.addEventListener("keydown", function(e){
+          if(e.key === "Backspace" && !box.value && idx > 0){
+            pinBoxes[idx-1].focus();
+          }
+        });
+      });
+    }
     app.querySelectorAll("[data-your-slot]").forEach(function(el){
       el.addEventListener("click", function(){
         setYourSlot(el.getAttribute("data-your-slot"), el.getAttribute("data-value"));
@@ -1398,6 +1554,9 @@
     if(shareBtn) shareBtn.onclick = copyShareText;
     app.querySelectorAll("[data-edit-name]").forEach(function(el){
       el.addEventListener("click", function(){ editFromBoard(el.getAttribute("data-edit-name")); });
+    });
+    app.querySelectorAll("[data-reset-response]").forEach(function(el){
+      el.addEventListener("click", function(e){ requestResetResponse(el.getAttribute("data-reset-response"), e); });
     });
 
     var modalCancel = document.getElementById("delete-modal-cancel");
