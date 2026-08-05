@@ -516,6 +516,7 @@
     pendingDeleteId: null,
     pendingResetName: null,
     pendingEditId: null,
+    pendingNewPoll: false,
     editingPollId: null,
     editTitleDraft: "",
     editDescDraft: "",
@@ -891,10 +892,15 @@
     state.pendingEditId = id;
     render();
   }
+  function requestNewPoll(){
+    state.pendingNewPoll = true;
+    render();
+  }
   function cancelDeletePoll(){
     state.pendingDeleteId = null;
     state.pendingResetName = null;
     state.pendingEditId = null;
+    state.pendingNewPoll = false;
     render();
   }
   async function confirmDeletePoll(){
@@ -904,6 +910,11 @@
     if(entered !== DELETE_PASSWORD){
       if(msgEl) msgEl.textContent = "Incorrect password.";
       if(input){ input.value = ""; input.focus(); }
+      return;
+    }
+    if(state.pendingNewPoll){
+      state.pendingNewPoll = false;
+      goCreate();
       return;
     }
     if(state.pendingResetName){
@@ -1066,7 +1077,7 @@
       state.view === "create" ? renderCreate() :
       state.view === "editpoll" ? renderEditPollView() :
       renderPollView()
-    ) + ((state.pendingDeleteId || state.pendingResetName || state.pendingEditId) ? renderDeleteModal() : '');
+    ) + ((state.pendingDeleteId || state.pendingResetName || state.pendingEditId || state.pendingNewPoll) ? renderDeleteModal() : '');
     attachHandlers();
     state.justFlippedKey = null;
     state.justFlippedValue = null;
@@ -1075,10 +1086,12 @@
   function renderDeleteModal(){
     var isReset = !!state.pendingResetName;
     var isEdit = !!state.pendingEditId;
+    var isNewPoll = !!state.pendingNewPoll;
     var title = isReset ? ('Enter password to reset ' + escapeHtml(state.pendingResetName) + '\'s response')
       : isEdit ? 'Enter password to edit this poll'
+      : isNewPoll ? 'Enter password to create a new poll'
       : 'Enter password to delete this poll';
-    var confirmLabel = isReset ? 'Reset response' : isEdit ? 'Continue' : 'Delete poll';
+    var confirmLabel = isReset ? 'Reset response' : isEdit ? 'Continue' : isNewPoll ? 'Continue' : 'Delete poll';
     return '<div class="modal-backdrop" id="delete-modal-backdrop">' +
       '<div class="modal-box">' +
         '<h4 class="modal-title">' + title + '</h4>' +
@@ -1488,7 +1501,7 @@
     var app = document.getElementById("app");
 
     var newPollBtn = document.getElementById("btn-new-poll");
-    if(newPollBtn) newPollBtn.onclick = goCreate;
+    if(newPollBtn) newPollBtn.onclick = requestNewPoll;
 
     var backBtn = document.getElementById("btn-back-home");
     if(backBtn) backBtn.onclick = goHome;
