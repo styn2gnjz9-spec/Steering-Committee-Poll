@@ -207,7 +207,7 @@
   .required-mark{color:var(--no);}
   .field{margin-bottom:22px;}
   .field-hint{color:var(--ink-soft); font-size:13px; margin:-2px 0 10px;}
-  input[type=text], textarea{
+  input[type=text], input[type=password], textarea{
     width:100%;
     font-family:var(--font-body);
     font-size:15px;
@@ -218,9 +218,22 @@
     padding:11px 13px;
     outline:none;
   }
-  input[type=text]:focus, textarea:focus{border-color:var(--amber); background:#fff;}
+  input[type=text]:focus, input[type=password]:focus, textarea:focus{border-color:var(--amber); background:#fff;}
   textarea{resize:vertical; min-height:64px;}
   .form-msg{font-family:var(--font-display); font-weight:600; font-size:12.5px; color:var(--no); margin-top:8px; min-height:16px;}
+
+  /* ---------- Modal ---------- */
+  .modal-backdrop{
+    position:fixed; inset:0; background:rgba(11,39,64,0.55);
+    display:flex; align-items:center; justify-content:center; z-index:2000; padding:20px;
+  }
+  .modal-box{
+    background:var(--panel); border-radius:var(--radius); padding:24px;
+    max-width:340px; width:100%; box-shadow:0 12px 40px rgba(0,0,0,0.3);
+  }
+  .modal-title{font-family:var(--font-display); font-weight:700; font-size:16px; margin:0 0 14px; color:var(--ink);}
+  .modal-msg{font-family:var(--font-display); font-weight:600; font-size:12.5px; color:var(--no); margin-top:8px; min-height:16px;}
+  .modal-actions{display:flex; gap:10px; margin-top:10px; justify-content:flex-end;}
 
   /* ---------- Calendar ---------- */
   .cal-wrap{display:flex; gap:22px; flex-wrap:wrap;}
@@ -431,6 +444,16 @@
   const fbApp = initializeApp(firebaseConfig);
   const db = getFirestore(fbApp);
 
+  // =====================================================================
+  // DELETE PASSWORD — required before a poll can be deleted.
+  // Change this to whatever you like. Heads up: this only stops casual/
+  // accidental deletions — since it lives in this file's source code,
+  // anyone who views the page source could read it. It's not real
+  // security, just a speed bump.
+  // =====================================================================
+  var DELETE_PASSWORD = "changeme";
+  // =====================================================================
+
   "use strict";
 
   var PRESET_TIMES = ["9:00 AM","10:00 AM","11:00 AM","12:00 PM","1:00 PM","2:00 PM","3:00 PM","4:00 PM"];
@@ -461,6 +484,7 @@
     durationMinutes: 60,
     dateOverrides: {},        // dateStr -> { active: {time:true}, custom: [times] }
     expandedDate: null,
+    pendingDeleteId: null,
     yourName: "",
     titleDraft: "",
     descDraft: "",
@@ -789,12 +813,30 @@
     openPoll(id);
   }
 
-  async function deletePoll(id, ev){
+  function requestDeletePoll(id, ev){
     if(ev) ev.stopPropagation();
-    if(!confirm("Delete this poll and all responses? This can't be undone.")) return;
+    state.pendingDeleteId = id;
+    render();
+  }
+  function cancelDeletePoll(){
+    state.pendingDeleteId = null;
+    render();
+  }
+  async function confirmDeletePoll(){
+    var input = document.getElementById("delete-password-input");
+    var entered = input ? input.value : "";
+    var msgEl = document.getElementById("delete-modal-msg");
+    if(entered !== DELETE_PASSWORD){
+      if(msgEl) msgEl.textContent = "Incorrect password.";
+      if(input){ input.value = ""; input.focus(); }
+      return;
+    }
+    var id = state.pendingDeleteId;
+    state.pendingDeleteId = null;
     await fsDeleteResponsesForPoll(id);
     await fsDeletePoll(id);
     showToast("Poll deleted");
+    render();
   }
 
   // ---------------- Poll voting actions ----------------
@@ -899,10 +941,24 @@
       state.view === "home" ? renderHome() :
       state.view === "create" ? renderCreate() :
       renderPollView()
-    );
+    ) + (state.pendingDeleteId ? renderDeleteModal() : '');
     attachHandlers();
     state.justFlippedKey = null;
     state.justFlippedValue = null;
+  }
+
+  function renderDeleteModal(){
+    return '<div class="modal-backdrop" id="delete-modal-backdrop">' +
+      '<div class="modal-box">' +
+        '<h4 class="modal-title">Enter password to delete this poll</h4>' +
+        '<input type="password" id="delete-password-input" placeholder="Password">' +
+        '<div class="modal-msg" id="delete-modal-msg"></div>' +
+        '<div class="modal-actions">' +
+          '<button class="btn btn-outline" id="delete-modal-cancel">Cancel</button>' +
+          '<button class="btn btn-primary" id="delete-modal-confirm">Delete poll</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
   }
 
   function renderConfigWarning(){
@@ -1246,7 +1302,7 @@
       el.addEventListener("click", function(e){ e.stopPropagation(); openPoll(el.getAttribute("data-open-btn")); });
     });
     app.querySelectorAll("[data-delete]").forEach(function(el){
-      el.addEventListener("click", function(e){ deletePoll(el.getAttribute("data-delete"), e); });
+      el.addEventListener("click", function(e){ requestDeletePoll(el.getAttribute("data-delete"), e); });
     });
 
     // Calendar
@@ -1341,6 +1397,20 @@
     app.querySelectorAll("[data-edit-name]").forEach(function(el){
       el.addEventListener("click", function(){ editFromBoard(el.getAttribute("data-edit-name")); });
     });
+
+    var modalCancel = document.getElementById("delete-modal-cancel");
+    if(modalCancel) modalCancel.onclick = cancelDeletePoll;
+    var modalConfirm = document.getElementById("delete-modal-confirm");
+    if(modalConfirm) modalConfirm.onclick = confirmDeletePoll;
+    var modalBackdrop = document.getElementById("delete-modal-backdrop");
+    if(modalBackdrop){
+      modalBackdrop.addEventListener("click", function(e){ if(e.target === modalBackdrop) cancelDeletePoll(); });
+    }
+    var pwInput = document.getElementById("delete-password-input");
+    if(pwInput){
+      pwInput.focus();
+      pwInput.addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); confirmDeletePoll(); } });
+    }
   }
 
   // ---------------- Boot ----------------
