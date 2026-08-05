@@ -706,6 +706,16 @@
   }
 
   // ---------------- Navigation ----------------
+  function setUrlHash(hash){
+    try{
+      if(hash){ history.replaceState(null, "", "#" + hash); }
+      else{ history.replaceState(null, "", location.pathname + location.search); }
+    }catch(e){ /* ignore if the browser context blocks history changes */ }
+  }
+  function pollUrl(id){
+    var base = location.href.split("#")[0];
+    return base + "#poll=" + id;
+  }
   function goHome(){
     state.currentPoll = null;
     state.pollId = null;
@@ -713,6 +723,7 @@
     state.yourPinDraft = "";
     state.pinVerifiedFor = null;
     state.yourAvailability = {};
+    setUrlHash(null);
     loadHome();
   }
   function goCreate(){
@@ -732,7 +743,7 @@
     state.descDraft = "";
     render();
   }
-  function openPoll(id){ loadPoll(id); }
+  function openPoll(id){ setUrlHash("poll=" + id); loadPoll(id); }
 
   // ---------------- Create-poll actions ----------------
   function calPrevMonth(){
@@ -989,7 +1000,7 @@
 
   function copyShareText(){
     var poll = state.currentPoll;
-    var msg = 'Please add your availability for "' + poll.title + '" — open the scheduling board and select it from the list.';
+    var msg = 'Please add your availability for "' + poll.title + '" — ' + pollUrl(poll.id);
     if(navigator.clipboard && navigator.clipboard.writeText){
       navigator.clipboard.writeText(msg);
     }
@@ -1304,7 +1315,7 @@
       (poll.description ? '<p class="poll-desc">' + escapeHtml(poll.description) + '</p>' : '') +
       '<div class="share-row">' +
         '<button class="btn btn-outline" id="share-btn">Copy share message</button>' +
-        '<span class="share-note">Anyone with this page\'s link can see and add availability.</span>' +
+        '<span class="share-note">Copies a link straight to this poll. Anyone with it can see and add availability.</span>' +
       '</div>' +
     '</div>' +
     '<div class="panel">' +
@@ -1573,7 +1584,14 @@
 
   // ---------------- Boot ----------------
   render();
-  if(state.configOk){ loadHome(); }
+  if(state.configOk){
+    var hashMatch = location.hash.match(/^#poll=(.+)$/);
+    if(hashMatch){
+      openPoll(decodeURIComponent(hashMatch[1]));
+    }else{
+      loadHome();
+    }
+  }
 </script>
 </body>
 </html>
